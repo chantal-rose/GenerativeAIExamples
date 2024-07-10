@@ -15,14 +15,13 @@
 
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 import concurrent.futures
+from preprocessor import extract_triples
 from tqdm import tqdm
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import multiprocessing
 import csv
 import streamlit as st
-
-from utils.preprocessor import extract_triples
 
 # function to process a single document (will run many of these processes in parallel)
 def process_document(doc, llm):
@@ -78,8 +77,6 @@ def save_triples_to_csvs(triples):
     # Create the relations DataFrame
     relations_df = pd.DataFrame({'relation_id': range(len(triples_df['relation'].unique())), 'relation_name': triples_df['relation'].unique()})
 
-    print(triples_df)
-    print(relations_df)
     # Get unique entities (subjects and objects) from triples_df
     entities = pd.concat([triples_df['subject'], triples_df['object']]).unique()
 

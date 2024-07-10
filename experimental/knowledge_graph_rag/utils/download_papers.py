@@ -58,21 +58,20 @@ def download_paper(result, download_dir, max_retries=3, retry_delay=5):
 def download_papers(search_terms, start_date, end_date, max_results=10, download_dir='papers', num_threads=4, max_retries=3, retry_delay=5):
     # Create the search query based on search terms and dates
     search_query = f"({search_terms}) AND submittedDate:[{start_date.strftime('%Y%m%d')} TO {end_date.strftime('%Y%m%d')}]"
-    client = arxiv.Client()
 
     search = arxiv.Search(
         query=search_query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.SubmittedDate,
     )
+
     # Create the download directory if it doesn't exist
     os.makedirs(download_dir, exist_ok=True)
 
     # Use a thread pool to download papers in parallel
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
-        for result in tqdm(client.results(search), total=max_results, unit='paper'):
-            print(result.title)
+        for result in tqdm(search.results(), total=max_results, unit='paper'):
             # Submit download tasks to the executor
             future = executor.submit(download_paper, result, download_dir, max_retries, retry_delay)
             futures.append(future)
@@ -111,7 +110,6 @@ if __name__ == "__main__":
     else:
         end_date = datetime.now()  # Default to today
 
-    search_query = ' AND '.join([f'all:"{term}"' for term in args.search_terms.split(",")])
     # Call the download_papers function with the provided arguments
-    download_papers(search_query, start_date, end_date, args.max_results, args.download_dir, args.num_threads, args.max_retries, args.retry_delay)
+    download_papers(args.search_terms, start_date, end_date, args.max_results, args.download_dir, args.num_threads, args.max_retries, args.retry_delay)
 

@@ -17,42 +17,15 @@ import getpass
 import os
 import json
 import ast
-
-
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-from llama_index.core import SimpleDirectoryReader
-
 
 if not os.environ.get("NVIDIA_API_KEY", "").startswith("nvapi-"):
     nvapi_key = getpass.getpass("Enter your NVIDIA API key: ")
     assert nvapi_key.startswith("nvapi-"), f"{nvapi_key[:5]}... is not a valid key"
     os.environ["NVIDIA_API_KEY"] = nvapi_key
 
-dirs_to_exclude = ["pages", "utils", "vectorstore", "venv", "volumes", "scripts"]
-required_exts = ["pdf"]
-
-
-def get_list_of_directories():
-    cwd = os.getcwd()
-
-    # Get a list of visible directories in the current working directory
-    return [d for d in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, d)) and not d.startswith('.') and '__' not in d and d not in dirs_to_exclude]
-
-
-def load_data(input_dir, num_workers):
-    reader = SimpleDirectoryReader(input_dir=input_dir, recursive=True, required_exts=required_exts)
-    documents = reader.load_data(num_workers=num_workers)
-    return documents
-
-
-def has_pdf_files(directory):
-    for file in os.listdir(directory):
-        if file.endswith(".pdf"):
-            return True
-    return False
-
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 
 def process_response(triplets_str):
     triplets_list = ast.literal_eval(triplets_str)
@@ -120,4 +93,3 @@ def generate_qa_pair(text, llm):
         return parsed_response
     except:
         return None
-    
