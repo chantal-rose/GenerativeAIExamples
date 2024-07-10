@@ -15,8 +15,8 @@
 
 import os
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, KnowledgeGraphIndex
-from utils.preprocessor import extract_triples
+
+from utils.preprocessor import get_list_of_directories, has_pdf_files
 from llama_index.core import ServiceContext
 import multiprocessing
 import pandas as pd
@@ -25,17 +25,8 @@ from utils.lc_graph import process_documents, save_triples_to_csvs
 from vectorstore.search import SearchHandler
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
-def load_data(input_dir, num_workers):
-    reader = SimpleDirectoryReader(input_dir=input_dir)
-    documents = reader.load_data(num_workers=num_workers)
-    return documents
 
-def has_pdf_files(directory):
-    for file in os.listdir(directory):
-        if file.endswith(".pdf"):
-            return True
-    return False
-
+st.set_page_config(page_title="Knowledge Graph RAG")
 st.title("Knowledge Graph RAG")
 
 st.subheader("Load Data from Files")
@@ -52,19 +43,16 @@ with st.sidebar:
     llm = ChatNVIDIA(model=llm)
 
 def app():
-    # Get the current working directory
-    cwd = os.getcwd()
-
     # Get a list of visible directories in the current working directory
-    directories = [d for d in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, d)) and not d.startswith('.') and '__' not in d]
-
+    directories = get_list_of_directories()
     # Create a dropdown menu for directory selection
-    selected_dir = st.selectbox("Select a directory:", directories, index=0)
+    selected_dir = st.selectbox("Select a directory:", directories, index=None)
 
     # Construct the full path of the selected directory
-    directory = os.path.join(cwd, selected_dir)
+    if selected_dir:
+        directory = os.path.join(os.getcwd(), selected_dir)
 
-    if st.button("Process Documents"):
+    if st.button("Process Documents", disabled=(selected_dir is None)):
         # Check if the selected directory has PDF files
         res = has_pdf_files(directory)
         if not res:
