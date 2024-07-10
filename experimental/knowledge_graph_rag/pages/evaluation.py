@@ -13,30 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import random
+
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, KnowledgeGraphIndex
-from utils.preprocessor import generate_qa_pair
-from llama_index.core import ServiceContext
-import multiprocessing
+import altair as alt
+import matplotlib.pyplot as plt
 import pandas as pd
 import networkx as nx
-from utils.lc_graph import process_documents, save_triples_to_csvs
-from vectorstore.search import SearchHandler
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
-import random
-import pandas as pd
-import time
-import json
+from concurrent.futures import ThreadPoolExecutor
+from langchain_community.graphs.networkx_graph import NetworkxEntityGraph
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.graphs.networkx_graph import NetworkxEntityGraph, get_entities
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from openai import OpenAI
 
 from vectorstore.search import SearchHandler
+from utils.lc_graph import process_documents
+from utils.preprocessor import get_list_of_directories, has_pdf_files, generate_qa_pair
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from openai import OpenAI
+st.set_page_config(page_title="Knowledge Graph RAG")
+
 reward_client = OpenAI(
     base_url = "https://integrate.api.nvidia.com/v1",
     api_key = os.environ["NVIDIA_API_KEY"]
@@ -79,17 +78,6 @@ def process_question(question, answer):
 prompt_template = ChatPromptTemplate.from_messages(
     [("system", "You are a helpful AI assistant named Envie. You will reply to questions only based on the context that you are provided. If something is out of context, you will refrain from replying and politely decline to respond to the user."), ("user", "{input}")]
 )
-
-def load_data(input_dir, num_workers):
-    reader = SimpleDirectoryReader(input_dir=input_dir)
-    documents = reader.load_data(num_workers=num_workers)
-    return documents
-
-def has_pdf_files(directory):
-    for file in os.listdir(directory):
-        if file.endswith(".pdf"):
-            return True
-    return False
 
 def get_text_RAG_response(question):
     chain = prompt_template | llm | StrOutputParser()
@@ -154,18 +142,16 @@ with st.sidebar:
     num_data = st.slider("How many Q&A pairs to generate?", 10, 100, 50, step=10)
 
 def app():
-    # Get the current working directory
-    cwd = os.getcwd()
-
-    # Get a list of visible directories in the current working directory
-    directories = [d for d in os.listdir(cwd) if os.path.isdir(os.path.join(cwd, d)) and not d.startswith('.') and '__' not in d]
-
+   # Get a list of visible directories in the current working directory
+    directories = get_list_of_directories()
     # Create a dropdown menu for directory selection
-    selected_dir = st.selectbox("Select a directory:", directories, index=0)
+    selected_dir = st.selectbox("Select a directory:", directories, index=None)
 
     # Construct the full path of the selected directory
-    directory = os.path.join(cwd, selected_dir)
-    if st.button("Process Documents"):
+    if selected_dir:
+        directory = os.path.join(os.getcwd(), selected_dir)
+
+    if st.button("Process Documents", disabled=(selected_dir is None)):
         # Check if the selected directory has PDF files
         res = has_pdf_files(directory)
         if not res:
@@ -260,6 +246,22 @@ def app():
                 # Display the first few rows of the updated DataFrame
                 st.write("First few rows of the updated data:")
                 st.dataframe(combined_results.head())
+
+                average_scores = combined_results.mean(axis=0, numeric_only=True)
+                rows = []
+                for index, value in average_scores.items():
+                    metric, category = tuple(index.split("_"))
+                    rows.append([metric, category, value])
+
+                final_df = pd.DataFrame(rows, columns=["metric", "category", "average score"])
+
+                gp_chart = alt.Chart(final_df).mark_bar().encode(
+                    x="metric:N",
+                    y="average score:Q",
+                    xOffset="category:N",
+                    color="category:N"
+                )
+                st.altair_chart(gp_chart, use_container_width=True)
 
 if __name__ == "__main__":
     app()
